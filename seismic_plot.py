@@ -36,7 +36,7 @@ class SeismicPlotter:
             'inline_start': int(arch['inline_start']),
             'xline_start':  int(arch['xline_start']),
             'z_start':      float(arch['z_start']),
-            'dt_map':       float(arch['dt']),
+            'dt':           float(arch['dt']),
             'domain':       arch.get('domain', 'time')
         }
         self._plot_slice(arr3d, meta, slice_type, slice_coord, config)
@@ -79,24 +79,26 @@ class SeismicPlotter:
         il0 = int(meta['inline_start'])
         xl0 = int(meta['xline_start'])
         z0 = float(meta['z_start'])
-        dt = float(meta['dt_map'])
+        dt = float(meta['dt'])
         domain = meta.get('domain', 'time')
 
+        # 计算水平坐标起点和标签
         if slice_type == 'inline':
             start = xl0
-            count = arr2d.shape[0]
             xlabel = 'Xline'
+            file_coord = il0 + slice_coord
         elif slice_type == 'xline':
             start = il0
-            count = arr2d.shape[0]
             xlabel = 'Inline'
+            file_coord = xl0 + slice_coord
         else:
             raise ValueError("slice_type 必须是 'inline' 或 'xline'")
 
+        count = arr2d.shape[0]
         axis_h = start + np.arange(count)
         axis_v = z0 + np.arange(arr2d.shape[1]) * dt
 
-        title = f"{slice_type.capitalize()}={slice_coord} ({domain})"
+        title = f"{slice_type.capitalize()}={file_coord} ({domain})"
         self.plot_from_2d(arr2d, axis_h, axis_v, title, config)
 
     def quick_show(self,
@@ -132,3 +134,19 @@ class SeismicPlotter:
             vmax = np.percentile(data, upper)
 
         return vmin, vmax
+
+    def _plot_slice(self,
+                    arr3d: np.ndarray,
+                    meta: dict,
+                    slice_type: str,
+                    slice_coord: int,
+                    config: dict = None) -> None:
+        # 使用 slice_coord 作为数组索引
+        if slice_type == 'inline':
+            arr2d = arr3d[slice_coord, :, :]
+        elif slice_type == 'xline':
+            arr2d = arr3d[:, slice_coord, :]
+        else:
+            raise ValueError("slice_type 必须是 'inline' 或 'xline'")
+
+        self.plot_2d_with_meta(arr2d, meta, slice_type, slice_coord, config)

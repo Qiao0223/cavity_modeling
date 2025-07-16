@@ -1,19 +1,17 @@
 import numpy as np
-import seismic_attribute as SA
 
 from seismic_wavelet_processor import SeismicWaveletProcessor
 from seismic_plot import SeismicPlotter
 
 if __name__ == '__main__':
 
-    data3d = np.load("input_numpy/YingXi_crop.npy")
-    data2d = data3d[470]
+    npz = np.load('input_npy/yingxi_crop.npz', allow_pickle=True)
+    seis3d = npz['data']
+    meta = npz['meta'].item()
 
-    processor = SeismicWaveletProcessor(dt=0.008, level_count=10, levels=[1,2,3,4,5,6,7,8,9,10])
-    # results = processor.reconstruct_slice(data2d)
+    slice_coord = 758
+    seis2d =seis3d[slice_coord]
 
-    # min 50, max 100, dt 0.008, level_count 10, level 1
-    results = processor.extract_frequency_bands(data2d, 50, 100)
     plotterSeis = SeismicPlotter(config={
             'clip': 'none',           # 'none', 'manual', 'percentile'
             'vmin': None,
@@ -22,17 +20,15 @@ if __name__ == '__main__':
             'upper_percentile': 99,
             'cmap': 'seismic',
         })
-    plotterSeis.quick_show(data2d)
 
     plotterBand = SeismicPlotter(config={
             'clip': 'manual',           # 'none', 'manual', 'percentile'
-            'vmin': -3,
-            'vmax': 3,
+            'vmin': -4,
+            'vmax': 4,
             'lower_percentile': 1,
             'upper_percentile': 99,
             'cmap': 'seismic',
     })
-
 
     plotterRms = SeismicPlotter(config={
             'clip': 'manual',           # 'none', 'manual', 'percentile'
@@ -42,12 +38,15 @@ if __name__ == '__main__':
             'upper_percentile': 99,
             'cmap': 'Oranges',
     })
-    plotterBand.quick_show(results[1].data)
 
-        # plotterRms.quick_show(SA.compute_rms(band.data, 5))
+    processor = SeismicWaveletProcessor(dt=0.008, level_count=10, levels=[1,2,3,4,5,6,7,8,9,10])
+    # results = processor.reconstruct_slice(seis2d)
 
-    # results_3d = processor.reconstruct_volume(data3d)
-    # a = results_3d[4].data
-    # np.save("input_numpy/a.npy", a)
-    # b = np.load("input_numpy/a.npy")
+    # min 50, max 100, dt 0.008, level_count 10, level 1
+    results = processor.extract_frequency_bands(seis2d, 50, 100)
+
+    plotterSeis.plot_2d_with_meta(seis2d, meta, "inline", slice_coord)
+    for band in results.values():
+        plotterBand.plot_2d_with_meta(band.data, meta, "inline", slice_coord)
+
 

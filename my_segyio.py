@@ -31,25 +31,29 @@ class MySegyio:
         os.makedirs(out_dir, exist_ok=True)
         base = os.path.splitext(os.path.basename(segy_path))[0]
         out_npz = os.path.join(out_dir, base + '.npz')
+
         with segyio.open(segy_path, 'r', strict=False) as src:
             traces = segyio.collect(src.trace)
-            arr2d  = np.array(traces)
+            arr2d = np.array(traces)
+
         if arr2d.shape[0] != self.num_inline * self.num_xline:
             raise ValueError(f"Trace count mismatch: {arr2d.shape[0]}")
+
         nt = arr2d.shape[1]
         arr3d = arr2d.reshape((self.num_inline, self.num_xline, nt))
-        np.savez_compressed(
-            out_npz,
-            data=arr3d,
-            num_inline=self.num_inline,
-            num_xline=self.num_xline,
-            inline_start=self.inline_start,
-            xline_start=self.xline_start,
-            z_start=self.z_start,
-            dt=self.dt,
-            domain=self.domin,
-            created_time = datetime.now(timezone.utc).isoformat()
-        )
+
+        meta = {
+            "num_inline": self.num_inline,
+            "num_xline": self.num_xline,
+            "inline_start": self.inline_start,
+            "xline_start": self.xline_start,
+            "z_start": self.z_start,
+            "dt": self.dt,
+            "domain": self.domin,
+            "created_time": datetime.now(timezone.utc).isoformat()
+        }
+
+        np.savez_compressed(out_npz, data=arr3d, meta=meta)
         print(f"Imported and saved NPZ: {out_npz}")
 
     def import_all(self, directory: str, out_dir: str = None) -> None:
@@ -130,12 +134,13 @@ class MySegyio:
 
 # 示例调用：无需命令行，直接在代码里配置参数并执行
 if __name__ == '__main__':
-    inline_start = 1600
-    inline_end   = 2440
-    xline_start  = 1000
-    xline_end    = 1780
+    # yingxi_crop
+    inline_start = 692
+    inline_end   = 1741
+    xline_start  = 1474
+    xline_end    = 3681
     dt           = 5
-    z_start   = 5712.50
+    z_start   = 6000
     domain = "depth"
 
     num_inline = inline_end - inline_start + 1
@@ -148,16 +153,16 @@ if __name__ == '__main__':
     )
 
     # 导入单文件
-    # my.import_file(
-    #     segy_path = 'input_segy/pps_lc.segy',
-    #     out_dir   = 'input_numpy'
-    # )
+    my.import_file(
+        segy_path = 'input_segy/yingxi_crop.segy',
+        out_dir   = 'input_npy'
+    )
 
     # 批量导入
     # my.import_all('E:/Bonan/Seismic/...', 'input_numpy')
 
     # 单文件导出
-    my.export_file('input_numpy/results_3d.npy', 'output_segy/recon_layer_2.segy', 'out_segy')
+    #my.export_file('input_numpy/results_3d.npy', 'output_segy/recon_layer_2.segy', 'out_segy')
 
     # 批量导出
     # my.export_all('input_numpy', 'input_segy/ref.sgy', 'out_segy')

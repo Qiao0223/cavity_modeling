@@ -75,7 +75,6 @@ def compute_continuity_3d(
 
     return continuity_smooth
 
-
 def main():
     # ---- 用户参数区 ----
     input_npy = 'numpy/YingXi_crop.npy'
