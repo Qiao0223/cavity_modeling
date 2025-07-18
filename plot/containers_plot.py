@@ -2,6 +2,7 @@
 from dependency_injector import containers, providers
 from plot.seismic_plot import SeismicPlotter
 
+# 'none', 'manual', 'percentile'
 class PlotterContainer(containers.DeclarativeContainer):
     seis = providers.Singleton(SeismicPlotter, config={
         'clip': 'none', 'vmin': None, 'vmax': None,

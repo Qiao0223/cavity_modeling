@@ -1,0 +1,29 @@
+{
+    "yingxi_crop": {
+        "inline_start": 692,
+        "inline_end": 1741,
+        "xline_start": 1474,
+        "xline_end": 3681,
+        "dt": 5,
+        "z_start": 6000,
+        "domain": "depth"
+    },
+    "fuyuan3_crop_0717": {
+        "inline_start": 700,
+        "inline_end": 1800,
+        "xline_start": 5000,
+        "xline_end": 8100,
+        "dt": 5,
+        "z_start": 5500,
+        "domain": "depth"
+    },
+    "fuyuan3_crop_0718": {
+        "inline_start": 700,
+        "inline_end": 1800,
+        "xline_start": 5000,
+        "xline_end": 8100,
+        "dt": 5,
+        "z_start": 5500,
+        "domain": "depth"
+    }
+}

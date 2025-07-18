@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "fuman"
+name = "cavity_modeling"
 version = "0.1.0"
 description = ""
 authors = ["Qiao <you@example.com>"]

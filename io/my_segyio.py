@@ -1,13 +1,16 @@
+import json
 import os
 import glob
 import segyio
 import numpy as np
 from datetime import datetime, timezone
 
+
 class MySegyio:
     """
     SEG-Y ↔ NumPy(.npz) 转换工具，支持单文件与批量操作。
     """
+
     def __init__(self,
                  num_inline: int,
                  num_xline: int,
@@ -62,7 +65,7 @@ class MySegyio:
         """
         out_dir = out_dir or os.path.join(directory, 'numpy_arrays')
         if os.path.isdir(directory):
-            patterns = ['*.sgy','*.segy']
+            patterns = ['*.sgy', '*.segy']
             files = []
             for p in patterns:
                 files.extend(glob.glob(os.path.join(directory, p)))
@@ -99,7 +102,6 @@ class MySegyio:
         self._copy_segy(srcpath=ref_segy, dstpath=out_sgy, new_trace=arr2d)
         print(f"Exported SEG-Y: {out_sgy}")
 
-
     def export_all(self, numpy_dir: str, ref_segy: str, out_dir: str) -> None:
         """
         批量导出目录下所有 .npz 或 .npy 文件为 SEG-Y。
@@ -114,7 +116,6 @@ class MySegyio:
         for np_file in files:
             self.export_file(np_file, ref_segy, out_dir)
 
-
     def _copy_segy(self, srcpath: str, dstpath: str, new_trace: np.ndarray) -> None:
         """
         复制 SEG-Y 头部并替换 trace 数据。
@@ -122,47 +123,48 @@ class MySegyio:
         with segyio.open(srcpath, 'r') as src:
             spec = segyio.spec()
             spec.sorting = src.sorting
-            spec.format  = src.format
+            spec.format = src.format
             spec.samples = src.samples
-            spec.ilines  = src.ilines
-            spec.xlines  = src.xlines
+            spec.ilines = src.ilines
+            spec.xlines = src.xlines
             with segyio.create(dstpath, spec) as dst:
                 dst.text[0] = src.text[0]
-                dst.bin      = src.bin
-                dst.header   = src.header
-                dst.trace    = new_trace
+                dst.bin = src.bin
+                dst.header = src.header
+                dst.trace = new_trace
+
 
 # 示例调用：无需命令行，直接在代码里配置参数并执行
 if __name__ == '__main__':
-    # yingxi_crop
-    inline_start = 692
-    inline_end   = 1741
-    xline_start  = 1474
-    xline_end    = 3681
-    dt           = 5
-    z_start   = 6000
-    domain = "depth"
+    # 读取 JSON 配置文件
+    with open(r'C:\Work\sunjie\Python\cavity_modeling\config.json', 'r') as f:
+        config = json.load(f)
 
-    num_inline = inline_end - inline_start + 1
-    num_xline  = xline_end  - xline_start + 1
+    # 获取 yingxi_crop 的配置
+    params = config['fuyuan3_crop_0718']
 
+    # 计算派生参数
+    num_inline = params['inline_end'] - params['inline_start'] + 1
+    num_xline = params['xline_end'] - params['xline_start'] + 1
+
+    # 初始化 MySegyio
     my = MySegyio(
         num_inline, num_xline,
-        inline_start, xline_start,
-        dt, domain, z_start
+        params['inline_start'], params['xline_start'],
+        params['dt'], params['domain'], params['z_start']
     )
 
     # 导入单文件
     my.import_file(
-        segy_path = 'input_segy/yingxi_crop.segy',
-        out_dir   = 'input_npy'
+        segy_path=r'C:\Work\sunjie\Python\cavity_modeling\input_segy\fuyuan3_crop_0718.segy',
+        out_dir=r'C:\Work\sunjie\Python\cavity_modeling\input_npy'
     )
 
     # 批量导入
     # my.import_all('E:/Bonan/Seismic/...', 'input_numpy')
 
     # 单文件导出
-    #my.export_file('input_numpy/results_3d.npy', 'output_segy/recon_layer_2.segy', 'out_segy')
+    # my.export_file('input_numpy/results_3d.npy', 'output_segy/recon_layer_2.segy', 'out_segy')
 
     # 批量导出
     # my.export_all('input_numpy', 'input_segy/ref.sgy', 'out_segy')
