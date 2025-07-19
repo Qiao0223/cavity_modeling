@@ -12,20 +12,21 @@ class MySegyio:
     """
 
     def __init__(self,
-                 num_inline: int,
-                 num_xline: int,
-                 inline_start: int,
-                 xline_start: int,
-                 dt: float,
-                 domin: str,
-                 z_start: float = 0.0):
+                 num_inline: int | None = None,
+                 num_xline: int | None = None,
+                 inline_start: int | None = None,
+                 xline_start: int | None = None,
+                 dt: float | None = None,
+                 domain: str | None = None,
+                 z_start: float | None = 0.0):
         self.num_inline = num_inline
         self.num_xline = num_xline
         self.inline_start = inline_start
         self.xline_start = xline_start
         self.dt = dt
         self.z_start = z_start
-        self.domin = domin
+        self.domain = domain
+        self._preloaded_data = None
 
     def import_file(self, segy_path: str, out_dir: str) -> None:
         """
@@ -133,15 +134,79 @@ class MySegyio:
                 dst.header = src.header
                 dst.trace = new_trace
 
+    @staticmethod
+    def load_data_only(npz_path: str) -> np.ndarray:
+        """
+        只读取 .npz 中的 3D 数据，不关心 meta。
+        优先使用 'data' 键。若无 'data'，尝试用形状和独立字段重建。
+        """
+        if not os.path.isfile(npz_path):
+            raise FileNotFoundError(npz_path)
+
+        arch = np.load(npz_path, allow_pickle=True)
+
+        # 常规路径：写入时使用 data=arr3d
+        if 'data' in arch:
+            arr3d = arch['data']
+            if arr3d.ndim != 3:
+                raise ValueError(f"'data' 不是 3D: shape={arr3d.shape}")
+            return arr3d
+
+        # 兼容：存在分散的 num_inline / num_xline 字段，且可能有扁平化存法(不建议，但处理)
+        keys = arch.files
+        required = {'num_inline', 'num_xline'}
+        if required.issubset(keys):
+            num_inline = int(arch['num_inline'])
+            num_xline = int(arch['num_xline'])
+
+            # 尝试寻找某个可能的数组字段
+            # 1) 如果有 raw_flat 或 traces 之类
+            candidate_arrays = [k for k in keys if k not in required and k not in ('inline_start','xline_start','z_start','dt','domain','meta')]
+            for k in candidate_arrays:
+                arr = arch[k]
+                # 如果已经是 3D 则直接用
+                if isinstance(arr, np.ndarray):
+                    if arr.ndim == 3 and arr.shape[0] == num_inline and arr.shape[1] == num_xline:
+                        return arr
+                    # 若是 2D 并能 reshape
+                    if arr.ndim == 2 and arr.shape[0] == num_inline * num_xline:
+                        arr3d = arr.reshape(num_inline, num_xline, arr.shape[1])
+                        return arr3d
+                    # 若是一维可能是展平
+                    if arr.ndim == 1 and (arr.size % (num_inline * num_xline) == 0):
+                        nt = arr.size // (num_inline * num_xline)
+                        arr3d = arr.reshape(num_inline, num_xline, nt)
+                        return arr3d
+
+        raise ValueError(f"无法在 {npz_path} 中定位 3D 数据（缺少 'data' 或可识别字段）")
+
+    @staticmethod
+    def load_all_data_only(directory: str, pattern: str = "*.npz") -> dict:
+        """
+        批量读取目录中所有 npz 的 3D 数据（只读 data），返回 {basename: ndarray}
+        出错文件跳过并打印警告。
+        """
+        if not os.path.isdir(directory):
+            raise NotADirectoryError(directory)
+
+        paths = glob.glob(os.path.join(directory, pattern))
+        result = {}
+        for p in paths:
+            base = os.path.splitext(os.path.basename(p))[0]
+            try:
+                result[base] = self.load_data_only(p)
+            except Exception as e:
+                print(f"[WARN] 跳过 {p}: {e}")
+        return result
 
 # 示例调用：无需命令行，直接在代码里配置参数并执行
 if __name__ == '__main__':
     # 读取 JSON 配置文件
-    with open(r'C:\Work\sunjie\Python\cavity_modeling\config.json', 'r') as f:
+    with open('config.json', 'r') as f:
         config = json.load(f)
 
     # 获取 yingxi_crop 的配置
-    params = config['fuyuan3_crop_0718']
+    params = config['yingxi_crop']
 
     # 计算派生参数
     num_inline = params['inline_end'] - params['inline_start'] + 1
@@ -156,8 +221,8 @@ if __name__ == '__main__':
 
     # 导入单文件
     my.import_file(
-        segy_path=r'C:\Work\sunjie\Python\cavity_modeling\input_segy\fuyuan3_crop_0718.segy',
-        out_dir=r'C:\Work\sunjie\Python\cavity_modeling\input_npy'
+        segy_path=r'../input_segy/yingxi_velocity_crop.segy',
+        out_dir=r'../input_npy'
     )
 
     # 批量导入
