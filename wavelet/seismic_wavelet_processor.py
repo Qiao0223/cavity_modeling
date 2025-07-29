@@ -96,8 +96,7 @@ class SeismicWaveletProcessor:
                                     sections,
                                     dt_rep,
                                     lvl_rep,
-                                    params_rep,
-                                    wave_rep)
+                                    params_rep)
             for i, sec_res in enumerate(tqdm(map_iter,
                                              total=ni,
                                              desc="Reconstruct volume",
@@ -135,61 +134,61 @@ class SeismicWaveletProcessor:
                 wave_func, _ = wavelet_obj.wavefun(length=kernel_size)
                 results[lvl].data[idx, :] = np.real(fftconvolve(coeffs[0], wave_func, mode='same'))
         return results
-
-    def extract_frequency_bands(
-        self,
-        data: np.ndarray,
-        freq_min: float,
-        freq_max: float
-    ) -> Dict[int, BandResult]:
-        fs = 1.0 / self.dt
-        band_count = self.level_count
-        edges = np.linspace(freq_min, freq_max, band_count + 1)
-        for idx in self.levels:
-            if idx < 1 or idx > band_count:
-                raise ValueError(f"band index {idx} out of 1..{band_count}")
-        band_params = {
-            idx: (
-                pywt.central_frequency(self.wavelet) * fs / ((edges[idx-1] + edges[idx]) / 2.0),
-                (edges[idx-1] + edges[idx]) / 2.0,
-                (edges[idx-1], edges[idx])
-            )
-            for idx in self.levels
-        }
-        shape = data.shape
-        results = {
-            idx: BandResult(
-                data=np.zeros(shape, dtype=data.dtype),
-                frequency=band_params[idx][1],
-                scale=band_params[idx][0],
-                freq_range=band_params[idx][2]
-            )
-            for idx in self.levels
-        }
-        wavelet_obj = pywt.ContinuousWavelet(self.wavelet)
-        def _process(trace: np.ndarray):
-            scales = [band_params[idx][0] for idx in self.levels]
-            coeffs, _ = pywt.cwt(trace, scales, self.wavelet, sampling_period=self.dt)
-            out = {}
-            for k, lvl in enumerate(self.levels):
-                length = coeffs[k].shape[-1]
-                kernel_size = min(int(10 * scales[k]), length)
-                wave_func, _ = wavelet_obj.wavefun(length=kernel_size)
-                out[lvl] = np.real(fftconvolve(coeffs[k], wave_func, mode='same'))
-            return out
-        if data.ndim == 3:
-            ni, nx, _ = data.shape
-            for i in tqdm(range(ni), desc="Extract bands volume", unit="inline"):
-                for j in range(nx):
-                    out = _process(data[i, j, :])
-                    for idx, arr in out.items():
-                        results[idx].data[i, j, :] = arr
-        elif data.ndim == 2:
-            n_tr, _ = data.shape
-            for i in tqdm(range(n_tr), desc="Extract bands slice", unit="trace"):
-                out = _process(data[i, :])
-                for idx, arr in out.items():
-                    results[idx].data[i, :] = arr
-        else:
-            raise ValueError("data must be 2D or 3D array")
-        return results
+    #
+    # def extract_frequency_bands(
+    #     self,
+    #     data: np.ndarray,
+    #     freq_min: float,
+    #     freq_max: float
+    # ) -> Dict[int, BandResult]:
+    #     fs = 1.0 / self.dt
+    #     band_count = self.level_count
+    #     edges = np.linspace(freq_min, freq_max, band_count + 1)
+    #     for idx in self.levels:
+    #         if idx < 1 or idx > band_count:
+    #             raise ValueError(f"band index {idx} out of 1..{band_count}")
+    #     band_params = {
+    #         idx: (
+    #             pywt.central_frequency(self.wavelet) * fs / ((edges[idx-1] + edges[idx]) / 2.0),
+    #             (edges[idx-1] + edges[idx]) / 2.0,
+    #             (edges[idx-1], edges[idx])
+    #         )
+    #         for idx in self.levels
+    #     }
+    #     shape = data.shape
+    #     results = {
+    #         idx: BandResult(
+    #             data=np.zeros(shape, dtype=data.dtype),
+    #             frequency=band_params[idx][1],
+    #             scale=band_params[idx][0],
+    #             freq_range=band_params[idx][2]
+    #         )
+    #         for idx in self.levels
+    #     }
+    #     wavelet_obj = pywt.ContinuousWavelet(self.wavelet)
+    #     def _process(trace: np.ndarray):
+    #         scales = [band_params[idx][0] for idx in self.levels]
+    #         coeffs, _ = pywt.cwt(trace, scales, self.wavelet, sampling_period=self.dt)
+    #         out = {}
+    #         for k, lvl in enumerate(self.levels):
+    #             length = coeffs[k].shape[-1]
+    #             kernel_size = min(int(10 * scales[k]), length)
+    #             wave_func, _ = wavelet_obj.wavefun(length=kernel_size)
+    #             out[lvl] = np.real(fftconvolve(coeffs[k], wave_func, mode='same'))
+    #         return out
+    #     if data.ndim == 3:
+    #         ni, nx, _ = data.shape
+    #         for i in tqdm(range(ni), desc="Extract bands volume", unit="inline"):
+    #             for j in range(nx):
+    #                 out = _process(data[i, j, :])
+    #                 for idx, arr in out.items():
+    #                     results[idx].data[i, j, :] = arr
+    #     elif data.ndim == 2:
+    #         n_tr, _ = data.shape
+    #         for i in tqdm(range(n_tr), desc="Extract bands slice", unit="trace"):
+    #             out = _process(data[i, :])
+    #             for idx, arr in out.items():
+    #                 results[idx].data[i, :] = arr
+    #     else:
+    #         raise ValueError("data must be 2D or 3D array")
+    #     return results

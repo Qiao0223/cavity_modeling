@@ -1,40 +1,17 @@
 import numpy as np
-
-from plot.containers_plot import PlotterContainer
-from wavelet.seismic_wavelet_processor import SeismicWaveletProcessor
-from attribute import rms
+import torch
 
 if __name__ == '__main__':
+    print("PyTorch 版本:", torch.__version__)
+    print("CUDA 是否可用:", torch.cuda.is_available())
+    print("CUDA 版本:", torch.version.cuda)
+    print("可用 GPU 数量:", torch.cuda.device_count())
+    if torch.cuda.is_available():
+        print("当前 GPU:", torch.cuda.get_device_name(0))
 
-    npz = np.load(r'C:\Work\sunjie\Python\cavity_modeling\input_npy\yingxi_crop.npz', allow_pickle=True)
-    seis3d = npz['data']
-    meta = npz['meta'].item()
+    # npz = np.load(r"C:\Work\sunjie\Python\cavity_modeling\data\train\label.npy")
+    # print(npz.shape)
 
-    slice_coord = 1000
-    seis2d =seis3d[slice_coord]
-
-    plotter_seis = PlotterContainer.seis()
-    plotter_band = PlotterContainer.band()
-    plotter_rms = PlotterContainer.rms()
-
-    # yingxi_crop dt = 0.008, level_count=10, level = 1, wavelet_param = 6
-    processor = SeismicWaveletProcessor(dt=0.008, level_count=10, levels=list(range(1,10)))
-    # results = processor.reconstruct_slice(seis2d)
-
-    # min 50, max 100, dt 0.008, level_count 10, level 1
-    results_1 = processor.extract_frequency_bands(seis2d, 50, 100)
-
-
-    plotter_seis.plot_2d_with_meta(seis2d, meta, "inline", slice_coord)
-    for band in results_1.values():
-        plotter_band.plot_2d_with_meta(band.data, meta, "inline", slice_coord)
-        # plotter_rms.plot_2d_with_meta(rms.rms_filter(band.data), meta, "inline", slice_coord)
-
-
-
-    processor = SeismicWaveletProcessor(dt=0.008, level_count=10, levels=list(range(1,10)))
-    results_2 = processor.reconstruct_slice(seis2d)
-    for band in results_2.values():
-        plotter_band.plot_2d_with_meta(band.data, meta, "inline", slice_coord)
-
+import pytorch_lightning as pl
+print(pl.__version__) 
 

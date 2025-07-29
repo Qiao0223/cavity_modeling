@@ -1,5 +1,4 @@
-/input_segy/
-/input_npy/
-/output_npy/
-/output_segy/
-/.idea/tarim.iml
+/.idea/
+/data/
+/attention_unet/log/
+/image/
