@@ -12,6 +12,9 @@ if __name__ == '__main__':
     # npz = np.load(r"C:\Work\sunjie\Python\cavity_modeling\data\train\label.npy")
     # print(npz.shape)
 
-import pytorch_lightning as pl
-print(pl.__version__) 
+    arr = np.load(r"/home/zzz/cavity_modeling/data/train/label.npy")  # 读取 npy 文件
+
+    # 方法 1：直接判断
+    is_all_zero = np.all(arr == 0)
+    print(is_all_zero)
 

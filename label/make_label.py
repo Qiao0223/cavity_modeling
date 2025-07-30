@@ -3,7 +3,7 @@ import numpy as np
 
 
 if __name__ == '__main__':
-    npz = np.load(r'C:\Work\sunjie\Python\cavity_modeling\input_npy\yingxi_crop.npz', allow_pickle=True)
+    npz = np.load(r'/home/zzz/cavity_modeling/data/input_npy/yingxi_crop.npz', allow_pickle=True)
     data = npz['data']
 
     # 打开 napari 界面

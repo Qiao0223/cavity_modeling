@@ -202,7 +202,7 @@ class MySegyio:
 # 示例调用：无需命令行，直接在代码里配置参数并执行
 if __name__ == '__main__':
     # 读取 JSON 配置文件
-    with open('config.json', 'r') as f:
+    with open('/home/zzz/cavity_modeling/myio/config.json', 'r') as f:
         config = json.load(f)
 
     # 获取 yingxi_crop 的配置
@@ -226,10 +226,13 @@ if __name__ == '__main__':
     # )
 
     # 批量导入
-    my.import_all(r'../data/input_segy', '../data/input_numpy')
+    # my.import_all(r'../data/input_segy', '../data/input_numpy')
 
     # 单文件导出
-    # my.export_file(r'../output_npy/frequency.npy', r'../input_segy/yingxi_crop.segy', r'../output_segy')
+    my.export_file(
+        r'/home/zzz/cavity_modeling/data/train/prediction.npy',
+        r'/home/zzz/cavity_modeling/data/input_segy/yingxi_crop.segy', 
+        r'/home/zzz/cavity_modeling/data/output_segy')
 
     # 批量导出
     # my.export_all('input_numpy', 'input_segy/ref.sgy', 'out_segy')

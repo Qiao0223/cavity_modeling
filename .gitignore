@@ -1,4 +1,6 @@
 /.idea/
 /data/
 /attention_unet/log/
+/attention_unet/__pycache__/
 /image/
+/myio/__pycache__/
