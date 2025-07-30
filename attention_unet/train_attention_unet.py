@@ -135,7 +135,7 @@ if __name__ == "__main__":
     checkpoint = ModelCheckpoint(monitor="val_loss", mode="min", save_top_k=1, filename="best-model")
 
     trainer = pl.Trainer(
-        max_epochs=1,
+        max_epochs=100,
         accelerator="gpu",
         devices=1,
         precision="16-mixed",
