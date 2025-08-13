@@ -163,7 +163,7 @@ def apply_wavelet_reconstruction(
             # omp.idx_ 包含了被选中的原子在字典中的列索引
 
             # 重构背景分量
-            background_trace = np.dot(dictionary_matrix[:, omp.idx_], omp.coef_)
+            background_trace = np.dot(dictionary_matrix, omp.coef_)
 
             # 从原始道中减去背景
             processed_trace = original_trace - background_trace
