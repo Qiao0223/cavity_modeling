@@ -163,7 +163,7 @@ def apply_wavelet_reconstruction(
             # omp.idx_ 包含了被选中的原子在字典中的列索引
 
             # 重构背景分量
-            background_trace = np.dot(dictionary_matrix, omp.coef_)
+            background_trace = np.dot(dictionary_matrix[:, omp.idx_], omp.coef_)
 
             # 从原始道中减去背景
             processed_trace = original_trace - background_trace
@@ -174,16 +174,6 @@ def apply_wavelet_reconstruction(
 
     print("小波重构完成！")
     return processed_volume, removed_background
-
-
-
-
-
-
-
-
-
-
 
 
 def visualize_reconstruction_result(original, processed, background, slice_index=None):
@@ -215,15 +205,14 @@ def visualize_reconstruction_result(original, processed, background, slice_index
 
 # --- 使用示例 (保持不变) ---
 if __name__ == '__main__':
-    npz = np.load(r'C:\Work\sunjie\Python\cavity_modeling\data\input_npy\yingxi_crop.npz', allow_pickle=True)
-    seis = npz['data']
+
 
 
     FREQ_MIN = 24.0
     FREQ_MAX = 54.0
     DZ_METERS = 5.0
     VELOCITY_MS = 6000.0
-    N_SAMPLES = seis.shape[2]
+    N_SAMPLES = 512
 
     dictionary, freqs, used_scales = build_ricker_dictionary(
         dz=DZ_METERS,
@@ -235,13 +224,5 @@ if __name__ == '__main__':
         visualize=True
     )
 
-    processed_data, background_data = apply_wavelet_reconstruction(
-        seismic_volume=seis,
-        dictionary_matrix=dictionary,
-        n_components_to_remove=10
-    )
-
-    print(f"\n处理后数据形状: {processed_data.shape}")
-    print(f"移除背景形状: {background_data.shape}")
-
-    visualize_reconstruction_result(seis, processed_data, background_data)
+    print(f"\n构建的字典矩阵形状为: {dictionary.shape}")
+    print("这个矩阵现在可以作为scikit-learn OMP算法的输入了。")
