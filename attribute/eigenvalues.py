@@ -46,11 +46,9 @@ def compute_eigenvalues(S_xx, S_yy, S_zz, S_xy, S_xz, S_yz, lambda1, lambda2, la
                 lambda2[x, y, z] = eigenvalues[1]
                 lambda3[x, y, z] = eigenvalues[2]
 
-
-def main():
-    """ 主函数 """
-    print("加载地震数据...")
-    data = load_data("numpy/recon_layer_5.npy")
+if __name__ == "__main__":
+    npz = np.load(r'..\data\input_npy\fuyuan3_crop.npz', allow_pickle=True)
+    data = npz['data']
 
     print("计算梯度...")
     I_x, I_y, I_z = compute_gradients(data)
@@ -72,12 +70,8 @@ def main():
     compute_eigenvalues(S_xx, S_yy, S_zz, S_xy, S_xz, S_yz, lambda1, lambda2, lambda3)
 
     # **改进：用 np.save() 正确保存 `.npy`**
-    np.save("numpy/lambda1.npy", lambda1)
-    np.save("numpy/lambda2.npy", lambda2)
-    np.save("numpy/lambda3.npy", lambda3)
+    np.save(r"../output_npy/lambda1.npy", lambda1)
+    np.save(r"../output_npy/lambda2.npy", lambda2)
+    np.save(r"../output_npy/lambda3.npy", lambda3)
 
     print("计算完成，特征值已保存为 lambda1.npy, lambda2.npy, lambda3.npy")
-
-
-if __name__ == "__main__":
-    main()

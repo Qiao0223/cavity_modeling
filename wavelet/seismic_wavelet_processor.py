@@ -11,6 +11,9 @@ import itertools
 class BandResult:
     """
     封装单个频段重构结果。
+    frequency: 频段中心频率
+    scale: 对应的 CWT 尺度
+    freq_range: 频段上下限 (f_min, f_max)
     """
     data: np.ndarray
     frequency: float
@@ -18,55 +21,70 @@ class BandResult:
     freq_range: Optional[Tuple[float, float]] = None
 
 
-def _reconstruct_section(section: np.ndarray,
-                          dt: float,
-                          levels: Sequence[int],
-                          params: Dict[int, Tuple[float, float, str]]) -> Dict[int, np.ndarray]:
-    shape = section.shape  # (nx, nt)
-    sec_results = {lvl: np.zeros(shape, dtype=section.dtype) for lvl in levels}
-    wavelet_name = next(iter(params.values()))[2]
-    wavelet_obj = pywt.ContinuousWavelet(wavelet_name)
-    for j in range(shape[0]):
+def _reconstruct_section(
+        section: np.ndarray,
+        dt: float,
+        params: Dict[int, Tuple[float, float, float, float, np.ndarray, str]]
+) -> Dict[int, np.ndarray]:
+    """
+    对二维截面进行小波重构，params: {idx: (scale, freq, f_min, f_max, wave_func, wavelet_name)}
+    返回: {idx: reconstructed_section}
+    """
+    n_tr, n_samples = section.shape
+    sec_results = {idx: np.zeros_like(section) for idx in params}
+    for j in range(n_tr):
         trace = section[j, :]
-        for lvl in levels:
-            scale, _, _ = params[lvl]
+        for idx, (scale, _, _, _, wave_func, wavelet_name) in params.items():
             coeffs, _ = pywt.cwt(trace, [scale], wavelet_name, sampling_period=dt)
-            # 逆小波重构
-            length = coeffs.shape[-1]
-            kernel_size = min(int(10 * scale), length)
-            wave_func, _ = wavelet_obj.wavefun(length=kernel_size)
-            sec_results[lvl][j, :] = np.real(fftconvolve(coeffs[0], wave_func, mode='same'))
+            sec_results[idx][j, :] = np.real(
+                fftconvolve(coeffs[0], wave_func, mode='same')
+            )
     return sec_results
 
 class SeismicWaveletProcessor:
     """
-    小波重构与频段提取处理器，支持自定义母小波。
-    构造时指定采样间隔(dt)、小波层级数量(level_count)、关心的 levels 及母小波名称。
-    支持多核并行计算加速 3D 体数据的处理。
+    输入自定义 scales 列表，自动计算对应中心频率及频段范围。
+    调用 reconstruct_volume/slice 可直接得到每个频段的重构结果。
     """
-
-    def __init__(self,
-                 dt: float,
-                 level_count: int,
-                 levels: Sequence[int],
-                 wavelet: str = 'morl'):
+    def __init__(
+        self,
+        dt: float,
+        scales: Sequence[float],
+        wavelet: str = 'morl',
+    ):
+        """
+        :param dt: 采样间隔
+        :param scales: CWT 尺度列表
+        :param wavelet: 母小波名称
+        """
         self.dt = dt
-        self.level_count = level_count
-        self.levels = levels
         self.wavelet = wavelet
-        self.scales, self.frequencies = self._compute_scales_and_frequencies()
-
-    def _compute_scales_and_frequencies(self) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        计算连续小波变换的 scales 和对应中心频率。
-        基于 pywt.central_frequency 动态适配母小波。
-        """
-        fs = 1.0 / self.dt
-        cf = pywt.central_frequency(self.wavelet)
-        s_min = 2 * cf
-        scales = s_min * (2.0 ** np.arange(self.level_count))
-        freqs = cf * fs / scales
-        return scales, freqs
+        # 强制提供 scales
+        self.scales = np.asarray(scales, dtype=float)
+        # 计算对应中心频率
+        fs = 1.0 / dt
+        cf = pywt.central_frequency(wavelet)
+        self.frequencies = cf * fs / self.scales
+        # 根据频率分布自动生成频段上下限
+        freqs = self.frequencies
+        n = len(freqs)
+        # 对频段排序，获取邻频差用于边界
+        sorted_idx = np.argsort(freqs)
+        sorted_f = freqs[sorted_idx]
+        # 计算边界
+        bounds = np.zeros((n+1,))
+        bounds[1:-1] = (sorted_f[:-1] + sorted_f[1:]) / 2
+        # 边缘延展相对间隔
+        bounds[0] = sorted_f[0] - (bounds[1] - sorted_f[0])
+        bounds[-1] = sorted_f[-1] + (sorted_f[-1] - bounds[-2])
+        # 每个 scale 的频段范围
+        self.freq_ranges = {}
+        for i, idx_orig in enumerate(sorted_idx):
+            fmin = bounds[i]
+            fmax = bounds[i+1]
+            self.freq_ranges[idx_orig] = (fmin, fmax)
+        # levels 直接作为索引
+        self.levels = list(range(len(scales)))
 
     def reconstruct_volume(
         self,
@@ -74,36 +92,37 @@ class SeismicWaveletProcessor:
     ) -> Dict[int, BandResult]:
         if volume.ndim != 3:
             raise ValueError("volume must be a 3D array")
-        ni, nx, _ = volume.shape
-        # 参数准备：scale, freq, wavelet
-        params = {lvl: (self.scales[lvl-1], self.frequencies[lvl-1], self.wavelet)
-                  for lvl in self.levels}
+        ni, nx, nt = volume.shape
+        # 缓存 wave_func 和参数
+        params: Dict[int, Tuple[float, float, float, float, np.ndarray, str]] = {}
+        wavelet_obj = pywt.ContinuousWavelet(self.wavelet)
+        for idx in self.levels:
+            scale = self.scales[idx]
+            freq = self.frequencies[idx]
+            fmin, fmax = self.freq_ranges[idx]
+            kernel_size = min(int(10 * scale), nt)
+            wave_func, _ = wavelet_obj.wavefun(length=kernel_size)
+            params[idx] = (scale, freq, fmin, fmax, wave_func, self.wavelet)
+        # 初始化结果
         results = {
-            lvl: BandResult(
+            idx: BandResult(
                 data=np.zeros_like(volume),
-                frequency=params[lvl][1],
-                scale=params[lvl][0]
+                frequency=params[idx][1],
+                scale=params[idx][0],
+                freq_range=(params[idx][2], params[idx][3])
             )
-            for lvl in self.levels
+            for idx in self.levels
         }
+        # 并行处理
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            dt_rep = itertools.repeat(self.dt)
-            lvl_rep = itertools.repeat(self.levels)
-            params_rep = itertools.repeat(params)
             sections = (volume[i, :, :] for i in range(ni))
-            wave_rep = itertools.repeat(self.wavelet)
-            map_iter = executor.map(_reconstruct_section,
-                                    sections,
-                                    dt_rep,
-                                    lvl_rep,
-                                    params_rep,
-                                    wave_rep)
-            for i, sec_res in enumerate(tqdm(map_iter,
-                                             total=ni,
-                                             desc="Reconstruct volume",
-                                             unit="slice")):
-                for lvl in self.levels:
-                    results[lvl].data[i, :, :] = sec_res[lvl]
+            dt_rep = itertools.repeat(self.dt)
+            params_rep = itertools.repeat(params)
+            for i, sec_res in enumerate(tqdm(
+                    executor.map(_reconstruct_section, sections, dt_rep, params_rep),
+                    total=ni, desc="Reconstruct volume", unit="slice")):
+                for idx in self.levels:
+                    results[idx].data[i, :, :] = sec_res[idx]
         return results
 
     def reconstruct_slice(
@@ -112,84 +131,30 @@ class SeismicWaveletProcessor:
     ) -> Dict[int, BandResult]:
         if section.ndim != 2:
             raise ValueError("section must be a 2D array")
-        n_tr, _ = section.shape
-        params = {lvl: (self.scales[lvl-1], self.frequencies[lvl-1])
-                  for lvl in self.levels}
-        results = {
-            lvl: BandResult(
-                data=np.zeros_like(section),
-                frequency=params[lvl][1],
-                scale=params[lvl][0]
-            )
-            for lvl in self.levels
-        }
+        _, nt = section.shape
+        # 缓存 wave_func 和参数
+        params: Dict[int, Tuple[float, float, float, float, np.ndarray, str]] = {}
         wavelet_obj = pywt.ContinuousWavelet(self.wavelet)
-        for idx in tqdm(range(n_tr), desc="Reconstruct slice", unit="trace"):
-            trace = section[idx, :]
-            for lvl in self.levels:
-                scale, _ = params[lvl]
-                coeffs, _ = pywt.cwt(trace, [scale], self.wavelet, sampling_period=self.dt)
-                # 直接调用内部逆变换
-                length = coeffs.shape[-1]
-                kernel_size = min(int(10 * scale), length)
-                wave_func, _ = wavelet_obj.wavefun(length=kernel_size)
-                results[lvl].data[idx, :] = np.real(fftconvolve(coeffs[0], wave_func, mode='same'))
-        return results
-
-    def extract_frequency_bands(
-        self,
-        data: np.ndarray,
-        freq_min: float,
-        freq_max: float
-    ) -> Dict[int, BandResult]:
-        fs = 1.0 / self.dt
-        band_count = self.level_count
-        edges = np.linspace(freq_min, freq_max, band_count + 1)
         for idx in self.levels:
-            if idx < 1 or idx > band_count:
-                raise ValueError(f"band index {idx} out of 1..{band_count}")
-        band_params = {
-            idx: (
-                pywt.central_frequency(self.wavelet) * fs / ((edges[idx-1] + edges[idx]) / 2.0),
-                (edges[idx-1] + edges[idx]) / 2.0,
-                (edges[idx-1], edges[idx])
-            )
-            for idx in self.levels
-        }
-        shape = data.shape
-        results = {
+            scale = self.scales[idx]
+            freq = self.frequencies[idx]
+            fmin, fmax = self.freq_ranges[idx]
+            kernel_size = min(int(10 * scale), nt)
+            wave_func, _ = wavelet_obj.wavefun(length=kernel_size)
+            params[idx] = (scale, freq, fmin, fmax, wave_func, self.wavelet)
+        sec_res = _reconstruct_section(section, self.dt, params)
+        return {
             idx: BandResult(
-                data=np.zeros(shape, dtype=data.dtype),
-                frequency=band_params[idx][1],
-                scale=band_params[idx][0],
-                freq_range=band_params[idx][2]
+                data=sec_res[idx],
+                frequency=params[idx][1],
+                scale=params[idx][0],
+                freq_range=(params[idx][2], params[idx][3])
             )
             for idx in self.levels
         }
-        wavelet_obj = pywt.ContinuousWavelet(self.wavelet)
-        def _process(trace: np.ndarray):
-            scales = [band_params[idx][0] for idx in self.levels]
-            coeffs, _ = pywt.cwt(trace, scales, self.wavelet, sampling_period=self.dt)
-            out = {}
-            for k, lvl in enumerate(self.levels):
-                length = coeffs[k].shape[-1]
-                kernel_size = min(int(10 * scales[k]), length)
-                wave_func, _ = wavelet_obj.wavefun(length=kernel_size)
-                out[lvl] = np.real(fftconvolve(coeffs[k], wave_func, mode='same'))
-            return out
-        if data.ndim == 3:
-            ni, nx, _ = data.shape
-            for i in tqdm(range(ni), desc="Extract bands volume", unit="inline"):
-                for j in range(nx):
-                    out = _process(data[i, j, :])
-                    for idx, arr in out.items():
-                        results[idx].data[i, j, :] = arr
-        elif data.ndim == 2:
-            n_tr, _ = data.shape
-            for i in tqdm(range(n_tr), desc="Extract bands slice", unit="trace"):
-                out = _process(data[i, :])
-                for idx, arr in out.items():
-                    results[idx].data[i, :] = arr
-        else:
-            raise ValueError("data must be 2D or 3D array")
-        return results
+
+# 使用示例：
+# processor = SeismicWaveletProcessor(dt=0.004, scales=[1.0, 2.0, 4.0])
+# results = processor.reconstruct_slice(seis2d)
+# for band in results.values():
+#     print(band.scale, band.frequency, band.freq_range)

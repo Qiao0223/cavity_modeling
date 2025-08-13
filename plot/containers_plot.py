@@ -11,7 +11,7 @@ class PlotterContainer(containers.DeclarativeContainer):
     })
 
     band = providers.Singleton(SeismicPlotter, config={
-        'clip': 'manual', 'vmin': -4, 'vmax': 4,
+        'clip': 'percentile', 'vmin': -4, 'vmax': 4,
         'lower_percentile': 1, 'upper_percentile': 99,
         'cmap': 'seismic'
     })

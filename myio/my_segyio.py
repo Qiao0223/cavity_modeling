@@ -53,7 +53,7 @@ class MySegyio:
             "xline_start": self.xline_start,
             "z_start": self.z_start,
             "dt": self.dt,
-            "domain": self.domin,
+            "domain": self.domain,
             "created_time": datetime.now(timezone.utc).isoformat()
         }
 
@@ -194,7 +194,7 @@ class MySegyio:
         for p in paths:
             base = os.path.splitext(os.path.basename(p))[0]
             try:
-                result[base] = self.load_data_only(p)
+                result[base] = MySegyio.load_data_only(p)
             except Exception as e:
                 print(f"[WARN] 跳过 {p}: {e}")
         return result
@@ -220,16 +220,16 @@ if __name__ == '__main__':
     )
 
     # 导入单文件
-    my.import_file(
-        segy_path=r'../input_segy/yingxi_velocity_crop.segy',
-        out_dir=r'../input_npy'
-    )
+    # my.import_file(
+    #     segy_path=r'../input_segy/yingxi_velocity_crop.segy',
+    #     out_dir=r'../input_npy'
+    # )
 
     # 批量导入
-    # my.import_all('E:/Bonan/Seismic/...', 'input_numpy')
+    my.import_all(r'../data/input_segy', '../data/input_numpy')
 
     # 单文件导出
-    # my.export_file('input_numpy/results_3d.npy', 'output_segy/recon_layer_2.segy', 'out_segy')
+    # my.export_file(r'../output_npy/frequency.npy', r'../input_segy/yingxi_crop.segy', r'../output_segy')
 
     # 批量导出
     # my.export_all('input_numpy', 'input_segy/ref.sgy', 'out_segy')
