@@ -226,10 +226,10 @@ if __name__ == '__main__':
     # )
 
     # 批量导入
-    my.import_all(r'../data/input_segy', '../data/input_numpy')
+    # my.import_all(r'../data/input_segy', '../data/input_numpy')
 
     # 单文件导出
     # my.export_file(r'../output_npy/frequency.npy', r'../input_segy/yingxi_crop.segy', r'../output_segy')
 
     # 批量导出
-    # my.export_all('input_numpy', 'input_segy/ref.sgy', 'out_segy')
+    my.export_all(r'../data/output_npy', '../data/input_segy/yingxi_crop.segy', '../data/output_segy')

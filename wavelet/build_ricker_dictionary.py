@@ -1,8 +1,8 @@
 import numpy as np
-import pywt  # 仍然需要用它来计算中心频率以保持一致性
+import pywt
 import matplotlib.pyplot as plt
-from sklearn.linear_model import OrthogonalMatchingPursuit
 from tqdm import tqdm
+
 
 def ricker_wavelet_formula(t, f):
     """
@@ -18,7 +18,6 @@ def ricker_wavelet_formula(t, f):
     pi_sq = np.pi ** 2
     f_sq = f ** 2
     t_sq = t ** 2
-    # Ricker wavelet formula
     A = (1.0 - 2.0 * pi_sq * f_sq * t_sq)
     B = np.exp(-pi_sq * f_sq * t_sq)
     return A * B
@@ -35,46 +34,29 @@ def build_ricker_dictionary(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     根据频谱分析结果，构建一个用于匹配追踪的Ricker小波字典。
-    *** 最终修正版：直接使用Ricker子波的数学公式构建，最稳定可靠 ***
-
-    Args:
-        dz, velocity, n_samples, freq_min, freq_max, num_atoms, visualize...
-
-    Returns:
-        tuple[np.ndarray, np.ndarray, np.ndarray]: ...
     """
-    # --- 1. 计算核心参数 ---
     dt = dz / velocity if velocity else None
     if not dt:
         raise ValueError("必须提供速度和深度采样间隔以计算时间采样间隔 dt。")
 
-    # --- 2. 生成频率列表 ---
     target_frequencies = np.linspace(freq_min, freq_max, num=num_atoms)
 
-    # --- 3. 创建字典矩阵 (使用数学公式) ---
     print(f"正在构建字典，包含 {num_atoms} 个原子...")
     dictionary_matrix = np.zeros((n_samples, num_atoms))
-
-    # 创建一个标准的时间轴，以0为中心
     time_axis = (np.arange(n_samples) - n_samples // 2) * dt
 
     for i, freq in enumerate(target_frequencies):
-        # *** 核心修正：直接调用公式生成小波 ***
         atom_current = ricker_wavelet_formula(time_axis, freq)
-
-        # 对原子进行L2范数归一化
         norm = np.linalg.norm(atom_current)
         if norm > 1e-9:
             atom_normalized = atom_current / norm
         else:
             atom_normalized = atom_current
-
         dictionary_matrix[:, i] = atom_normalized
-
     print("字典构建完成！")
 
-    # --- 4. 可视化 (保持不变) ---
     if visualize:
+        # --- 设置中文字体 ---
         plt.rcParams['font.sans-serif'] = ['SimHei']
         plt.rcParams['axes.unicode_minus'] = False
 
@@ -94,83 +76,74 @@ def build_ricker_dictionary(
         plt.ylim(-y_max, y_max)
         plt.show()
 
-    # 虽然我们没用scales来生成，但为了接口统一还是返回它
     central_freq_ricker = pywt.central_frequency('mexh', precision=10)
     scales = central_freq_ricker / (target_frequencies * dt)
 
     return dictionary_matrix, target_frequencies, scales
 
 
-def apply_wavelet_reconstruction(
+def apply_wavelet_reconstruction_single_thread(
         seismic_volume: np.ndarray,
-        dictionary_matrix: np.ndarray,
-        n_components_to_remove: int = 1
+        base_dictionary: np.ndarray,
+        n_components_to_remove: int = 10
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    对三维地震数据体应用小波重构，移除最强的背景分量。
-
-    Args:
-        seismic_volume (np.ndarray):
-            输入的三维地震数据体 (n_inlines, n_xlines, n_samples)。
-        dictionary_matrix (np.ndarray):
-            预先构建好的小波字典 (n_samples, num_atoms)。
-        n_components_to_remove (int):
-            要从每条道中移除的能量最强的分量数量。
-            根据论文，这个值通常为 1。
-
-    Returns:
-        tuple[np.ndarray, np.ndarray]:
-            一个元组，包含:
-            - processed_volume: 处理后的三维数据体。
-            - removed_background: 被移除的背景部分的三维数据体（用于QC）。
+    对三维地震数据体应用小波重构 (单线程版)。
+    手动实现匹配追踪的核心逻辑。
     """
-    # --- 1. 初始化 ---
     n_inlines, n_xlines, n_samples = seismic_volume.shape
+    num_freq_atoms = base_dictionary.shape[1]
 
-    # 创建空的numpy数组来存储结果
     processed_volume = np.zeros_like(seismic_volume, dtype=np.float32)
     removed_background = np.zeros_like(seismic_volume, dtype=np.float32)
 
-    # OMP算法需要数据是列向量，我们先转置字典以提高后续计算效率
-    # fit方法期望的字典是 (n_features, n_components)，这里是 (n_samples, n_atoms)
-    # y是 (n_samples, )
-    # coef_ 将是 (n_components, )
+    print("开始对地震数据体进行小波重构 (单线程)...")
 
-    print("开始对地震数据体进行小波重构...")
+    # 使用tqdm来显示总进度
+    total_traces = n_inlines * n_xlines
+    with tqdm(total=total_traces, desc="处理地震道") as pbar:
+        for i in range(n_inlines):
+            for j in range(n_xlines):
+                original_trace = seismic_volume[i, j, :]
 
-    # --- 2. 逐道处理 ---
-    # 使用tqdm来显示进度条
-    for i in tqdm(range(n_inlines), desc="处理 Inlines"):
-        for j in range(n_xlines):
-            # 提取单条地震道
-            original_trace = seismic_volume[i, j, :]
+                if np.all(original_trace == 0):
+                    pbar.update(1)
+                    continue
 
-            # 如果道是平的（全为0），则跳过
-            if np.all(original_trace == 0):
-                continue
+                residual = original_trace.copy()
+                background_trace = np.zeros_like(residual)
 
-            # 创建OMP模型实例
-            # 我们分解出比要移除的分量稍多一点，以确保能捕获到最强的那个
-            # n_nonzero_coefs 定义了我们要找多少个“原子”来表示信号
-            omp = OrthogonalMatchingPursuit(n_nonzero_coefs=n_components_to_remove)
+                # 迭代移除分量
+                for _ in range(n_components_to_remove):
+                    best_proj_amp = 0
+                    best_reconstructed_atom = None
 
-            # 使用OMP拟合数据
-            # reshape(-1, 1) 将原始道变为列向量，虽然OMP的y可以是一维的
-            omp.fit(dictionary_matrix, original_trace)
+                    # 遍历所有频率的原子
+                    for atom_idx in range(num_freq_atoms):
+                        atom = base_dictionary[:, atom_idx]
 
-            # --- 3. 重构背景并执行减法 ---
-            # omp.coef_ 包含了被选中的原子的系数（振幅）
-            # omp.idx_ 包含了被选中的原子在字典中的列索引
+                        # 使用卷积模拟滑窗匹配
+                        projections = np.convolve(residual, atom[::-1], mode='same')
 
-            # 重构背景分量
-            background_trace = np.dot(dictionary_matrix, omp.coef_)
+                        # 找到最佳匹配位置和振幅
+                        best_shift_idx = np.argmax(np.abs(projections))
+                        current_proj_amp = projections[best_shift_idx]
 
-            # 从原始道中减去背景
-            processed_trace = original_trace - background_trace
+                        if np.abs(current_proj_amp) > np.abs(best_proj_amp):
+                            best_proj_amp = current_proj_amp
+                            # 重构这个最佳匹配的原子
+                            shifted_atom = np.roll(atom, best_shift_idx - n_samples // 2)
+                            # 因为原子能量为1，所以重构分量就是 投影系数 * 平移后的原子
+                            best_reconstructed_atom = best_proj_amp * shifted_atom
 
-            # 存储结果
-            processed_volume[i, j, :] = processed_trace
-            removed_background[i, j, :] = background_trace
+                    # 从残差中减去这个本轮找到的最佳分量
+                    if best_reconstructed_atom is not None:
+                        residual -= best_reconstructed_atom
+                        background_trace += best_reconstructed_atom
+
+                processed_volume[i, j, :] = residual
+                removed_background[i, j, :] = background_trace
+                pbar.update(1)
 
     print("小波重构完成！")
     return processed_volume, removed_background
@@ -178,10 +151,14 @@ def apply_wavelet_reconstruction(
 
 def visualize_reconstruction_result(original, processed, background, slice_index=None):
     """可视化小波重构前后的剖面对比"""
-    if slice_index is None:
-        slice_index = original.shape[0] // 2  # 默认显示中间的剖面
+    # --- 设置中文字体 ---
+    plt.rcParams['font.sans-serif'] = ['SimHei']
+    plt.rcParams['axes.unicode_minus'] = False
 
-    fig, axes = plt.subplots(1, 3, figsize=(18, 8), sharex=True, sharey=True)
+    if slice_index is None:
+        slice_index = original.shape[0] // 2
+
+    fig, axes = plt.subplots(1, 3, figsize=(20, 8), sharex=True, sharey=True)
 
     vmax = np.percentile(np.abs(original[slice_index, :, :]), 98)
 
@@ -191,7 +168,7 @@ def visualize_reconstruction_result(original, processed, background, slice_index
     axes[0].set_xlabel("Crossline")
 
     axes[1].imshow(background[slice_index, :, :].T, cmap='seismic', aspect='auto', vmin=-vmax, vmax=vmax)
-    axes[1].set_title(f"被移除的背景 (第一个分量)")
+    axes[1].set_title(f"被移除的背景")
     axes[1].set_xlabel("Crossline")
 
     axes[2].imshow(processed[slice_index, :, :].T, cmap='seismic', aspect='auto', vmin=-vmax, vmax=vmax)
@@ -203,26 +180,50 @@ def visualize_reconstruction_result(original, processed, background, slice_index
     plt.show()
 
 
-# --- 使用示例 (保持不变) ---
+# --- 主程序 ---
 if __name__ == '__main__':
+    # --- 1. 设置参数 ---
+    # 定义数据路径
+    SEISMIC_FILE_PATH = r'C:\Work\sunjie\Python\cavity_modeling\data\input_npy\yingxi_crop.npz'
 
-
-
+    # 定义处理参数
     FREQ_MIN = 24.0
     FREQ_MAX = 54.0
     DZ_METERS = 5.0
     VELOCITY_MS = 6000.0
-    N_SAMPLES = 512
+    NUM_ATOMS = 30  # 字典中的原子（频率）数量
+    COMPONENTS_TO_REMOVE = 10
 
+    # --- 2. 加载数据 ---
+    print(f"从 {SEISMIC_FILE_PATH} 加载数据...")
+    with np.load(SEISMIC_FILE_PATH, allow_pickle=True) as npz:
+        seis = npz['data']
+    print(f"数据加载完成，形状为: {seis.shape}")
+    N_SAMPLES = seis.shape[2]
+
+    # --- 3. 构建小波字典 ---
     dictionary, freqs, used_scales = build_ricker_dictionary(
         dz=DZ_METERS,
         velocity=VELOCITY_MS,
         n_samples=N_SAMPLES,
         freq_min=FREQ_MIN,
         freq_max=FREQ_MAX,
-        num_atoms=60,
-        visualize=True
+        num_atoms=NUM_ATOMS,
+        visualize=False  # 在正式处理时可以关闭可视化以节省时间
     )
 
-    print(f"\n构建的字典矩阵形状为: {dictionary.shape}")
-    print("这个矩阵现在可以作为scikit-learn OMP算法的输入了。")
+    # --- 4. 执行小波重构 (单线程) ---
+    processed_data, background_data = apply_wavelet_reconstruction_single_thread(
+        seismic_volume=seis,
+        base_dictionary=dictionary,
+        n_components_to_remove=COMPONENTS_TO_REMOVE
+    )
+
+    # --- 5. 结果分析与可视化 ---
+    print(f"\n处理后数据形状: {processed_data.shape}")
+    print(f"移除背景形状: {background_data.shape}")
+
+    # 可视化结果
+    visualize_reconstruction_result(seis, processed_data, background_data)
+    np.save("processed_data.npy", processed_data)
+    np.save("background_data.npy", background_data)
