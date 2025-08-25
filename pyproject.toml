@@ -17,7 +17,6 @@ pywavelets = "^1.8.0"
 opencv-python = "^4.11.0.86"
 numpy = "^2.2.6"
 scikit-image = "^0.25.2"
-vmdpy = "^0.2"
 requests = "^2.32.4"
 bs4 = "^0.0.2"
 dependency-injector = "^4.48.1"
@@ -30,6 +29,7 @@ torch = {version = "2.6.0", source = "pytorch-cu126"}
 torchvision = {version = "0.21.0", source = "pytorch-cu126"}
 torchaudio = {version = "2.6.0", source = "pytorch-cu126"}
 scikit-learn = "^1.7.1"
+vmdpy = "^0.2"
 
 
 [[tool.poetry.source]]
