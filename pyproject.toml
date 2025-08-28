@@ -11,7 +11,6 @@ segyio = "^1.9.13"
 matplotlib = "^3.10.0"
 tqdm = "^4.67.1"
 numba = "^0.61.0"
-scipy = "^1.15.2"
 pandas = "^2.2.3"
 pywavelets = "^1.8.0"
 opencv-python = "^4.11.0.86"
@@ -30,6 +29,7 @@ torchvision = {version = "0.21.0", source = "pytorch-cu126"}
 torchaudio = {version = "2.6.0", source = "pytorch-cu126"}
 scikit-learn = "^1.7.1"
 vmdpy = "^0.2"
+scipy = "^1.16.1"
 
 
 [[tool.poetry.source]]

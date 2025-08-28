@@ -164,7 +164,7 @@ def visualize_fusion_result(original_slice, fused_mode, selected_indices_str):
 # =============================================================================
 def main():
     # ==================== 用户参数设置区域 ====================
-    input_file_path = r'C:\Work\sunjie\Python\cavity_modeling\data\input_npy\yingxi_crop.npz'
+    input_file_path = r'C:\Work\sunjie\Python\cavity_modeling\data\input_npy\fuyuan3_crop.npz'
     processing_axis = 1
     slice_to_preview = 500
     alpha, tau, K, DC, init, tol = 2000, 0., 8, 0, 1, 1e-7
