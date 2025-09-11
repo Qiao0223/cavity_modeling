@@ -106,7 +106,7 @@ if __name__ == '__main__':
     # --- 3. 定义处理目标和滤波参数 ---
     PROCESSING_AXIS = 1
     SLICE_INDEX = 500
-    FILTER_HALF_LENGTH = 50
+    FILTER_HALF_LENGTH = 10
     DIP_SMOOTHING_SIGMA = [1.5, 7.5]
 
     # --- 4. 加载完整的3D数据 ---

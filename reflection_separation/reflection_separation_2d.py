@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter1d
 from tqdm import tqdm
 
-# 全局设置字体，解决中文乱码问题
 plt.rcParams['font.sans-serif'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
+# ... (ricker_wavelet, perform_matching_pursuit_2d, visualize_separation_results_2d 函数保持不变) ...
 
 # =============================================================================
 # 自定义雷克子波函数
@@ -96,7 +96,6 @@ def separate_strong_reflection_2d(
     background_amplitude = gaussian_filter1d(amplitude_profile, sigma=params['smoothing_sigma'])
     lambda_profile = background_amplitude / (amplitude_profile + 1e-9)
 
-    # --- !! 关键优化：对 Lambda 剖面本身进行平滑 !! ---
     lambda_smoothing_sigma = params.get('lambda_smoothing_sigma')
     if lambda_smoothing_sigma and lambda_smoothing_sigma > 0:
         print(f"  - 对 Lambda 剖面进行平滑 (sigma={lambda_smoothing_sigma})...")
@@ -105,12 +104,22 @@ def separate_strong_reflection_2d(
     final_profile = seismic_profile.copy()
     win_half_width = params['time_window_half_width']
 
+    # 获取压制系数
+    suppression_factor = params.get('suppression_factor', 1.0)  # 默认为1，即不增强压制
+    if suppression_factor != 1.0:
+        print(f"  - [优化] 应用强反射压制系数 (系数={suppression_factor})...")
+
     with tqdm(total=seismic_profile.shape[0], desc="执行最终分离") as pbar:
         for j in range(seismic_profile.shape[0]):
             t0 = horizon_profile[j]
             t_start, t_end = max(0, t0 - win_half_width), min(seismic_profile.shape[1], t0 + win_half_width)
 
-            corrected_wavelet = reconstructed_wavelets[j, :] * lambda_profile[j]
+            # 原始估计的强反射
+            strong_reflection_estimated = reconstructed_wavelets[j, :] * lambda_profile[j]
+
+            # 应用压制系数进行强制干预
+            corrected_wavelet = strong_reflection_estimated * suppression_factor
+
             len_to_place = t_end - t_start
 
             final_profile[j, t_start:t_end] -= corrected_wavelet[:len_to_place]
@@ -178,14 +187,15 @@ if __name__ == '__main__':
 
     # --- 2. 定义处理目标和算法参数 ---
     PROCESSING_AXIS = 1
-    SLICE_INDEX = 500
+    SLICE_INDEX = 350
 
     # 算法核心参数 (可调)
     algorithm_params = {
         'time_window_half_width': 25,
-        'frequencies_to_search': np.arange(15, 70, 1),
-        'smoothing_sigma': 10.0,
-        'lambda_smoothing_sigma': 5.0,  # <-- 新增：Lambda平滑系数 (道数)，从 3.0 或 5.0 开始尝试
+        'frequencies_to_search': np.arange(15, 70, 5),  # <-- 恢复步长
+        'smoothing_sigma': 30.0,  # <-- 增大 sigma
+        'lambda_smoothing_sigma': 5.0,
+        'suppression_factor': 1,  # <-- 新增：强制压制系数，从 1.1, 1.2, 1.5 等尝试
     }
 
     # --- 3. 加载完整的3D数据 ---
