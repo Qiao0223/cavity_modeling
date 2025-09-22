@@ -118,8 +118,7 @@ def main():
     """主函数：从三维数据中提取一个二维剖面进行处理和可视化。"""
     # ==================== 用户参数设置区域 ====================
     # 1. 输入文件路径 (三维 .npy 或 .npz 文件)
-    # input_file_path = r'C:\Work\sunjie\Python\cavity_modeling\data\input_npy\yingxi_crop.npy'
-    input_file_path = r'C:\Work\sunjie\Python\cavity_modeling\data\batch\residual_3d.npy'
+    input_file_path = r'C:\Work\sunjie\Python\cavity_modeling\data\input_npy\yingxi_crop.npy'
 
     # 2. 选择要处理的剖面方向 (0: Inline, 1: Crossline, 2: Time Slice)
     #    假设数据形状为 (inline, xline, dt)
@@ -129,7 +128,7 @@ def main():
     slice_to_process = 500
 
     # 4. 正则化参数 gamma (关键调试参数)
-    gamma_value = 0.0008
+    gamma_value = 0.0001
 
     # 5. 设置最大迭代次数
     max_iterations = 300

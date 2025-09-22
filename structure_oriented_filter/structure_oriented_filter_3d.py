@@ -157,18 +157,18 @@ def structure_oriented_mean_filter_3d_with_progress(
 if __name__ == '__main__':
     # --- 1. 设置文件路径 ---
     BASE_PATH = r'C:\Work\sunjie\Python\cavity_modeling\data'
-    SEISMIC_NPY_PATH = os.path.join(BASE_PATH, r'input_npy\yingxi_crop.npy')
-    DIP_IL_NPY_PATH = os.path.join(BASE_PATH, r'input_npy\yingxi_inline_dip.npy')
-    DIP_XL_NPY_PATH = os.path.join(BASE_PATH, r'input_npy\yingxi_xline_dip.npy')
+    SEISMIC_NPY_PATH = r"C:\Work\sunjie\Python\cavity_modeling\data\input_npy\luchang\LC_CUT.npy"
+    DIP_IL_NPY_PATH = r"C:\Work\sunjie\Python\cavity_modeling\data\input_npy\luchang\luchang_inline_dip.npy"
+    DIP_XL_NPY_PATH = r"C:\Work\sunjie\Python\cavity_modeling\data\input_npy\luchang\luchang_crossline_dip.npy"
 
     # --- 新增: 定义输出路径 ---
-    OUTPUT_DIR = os.path.join(BASE_PATH, 'output_npy')
+    OUTPUT_DIR = r"C:\Work\sunjie\Python\cavity_modeling\data\output_npy"
     os.makedirs(OUTPUT_DIR, exist_ok=True)  # 确保输出目录存在
-    BACKGROUND_SAVE_PATH = os.path.join(OUTPUT_DIR, 'background_model_3d_25.npy')
-    RESIDUAL_SAVE_PATH = os.path.join(OUTPUT_DIR, 'residual_3d_25.npy')
+    BACKGROUND_SAVE_PATH = os.path.join(OUTPUT_DIR, 'E_background.npy')
+    RESIDUAL_SAVE_PATH = os.path.join(OUTPUT_DIR, 'E_residual.npy')
 
     # --- 2. 定义数据采集参数 ---
-    seismic_params_full = {'dz': 5.0, 'dy': 12.5, 'dx': 12.5}
+    seismic_params_full = {'dz': 5.0, 'dy': 25, 'dx': 25}
 
     # --- 3. 定义3D滤波参数 ---
     FILTER_IL_HALF_LENGTH = 25

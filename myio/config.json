@@ -16,5 +16,23 @@
         "dt": 5,
         "z_start": 5500,
         "domain": "depth"
+    },
+    "yingxi_wangli":{
+        "inline_start": 1150,
+        "inline_end": 1673,
+        "xline_start": 2074,
+        "xline_end": 3174,
+        "dt": 5,
+        "z_start": 0,
+        "domain": "depth"
+    },
+    "luchang_crop":{
+    "inline_start": 1600,
+    "inline_end": 2440,
+    "xline_start": 1000,
+    "xline_end": 1780,
+    "dt": 5,
+    "z_start": 5300,
+    "domain": "depth"
     }
 }

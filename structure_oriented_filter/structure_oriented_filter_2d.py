@@ -69,25 +69,56 @@ def structure_oriented_mean_filter_2d(
 def visualize_results_slice_2d(
         original_slice, background_slice, params, slice_info
 ):
-    """可视化单个2D剖面的滤波效果。(此函数无需修改)"""
+    """
+    可视化单个2D剖面的滤波效果。
+    (此版本已修改，为残差图使用独立的、自动调整的色标)
+    """
+    # 1. 计算残差
     residual_slice = original_slice - background_slice
+
+    # 2. 设置坐标轴和范围 (与原代码相同)
     dx_label = f"(道间距: {params.get('dx', params.get('dy'))} m)"
     xlabel = "Xline " + dx_label if 'dx' in params else "Inline " + dx_label
     x_extent = original_slice.shape[1] * params.get('dx', params.get('dy'))
     z_extent = original_slice.shape[0] * params['dz']
     plot_extent = [0, x_extent, z_extent, 0]
+
+    # 3. 创建图像布局
     fig, axes = plt.subplots(1, 3, figsize=(24, 10), sharex=True, sharey=True)
-    vmax = np.percentile(np.abs(original_slice), 99)
-    axes[0].imshow(original_slice, cmap='seismic', aspect='auto', vmin=-vmax, vmax=vmax, extent=plot_extent)
+
+    # --- 修改核心 ---
+    # 4. 为原始图和背景图设置色标
+    #    这个色标基于原始数据的范围
+    vmax_orig = np.percentile(np.abs(original_slice), 99)
+
+    # 5. (新增) 为残差图单独设置色标
+    #    这个色标基于残差数据自身的范围
+    vmax_residual = np.percentile(np.abs(residual_slice), 99)
+    # --- 修改结束 ---
+
+    # 6. 绘制三个子图
+    # 绘制 1: 原始剖面 (使用原始数据色标)
+    im1 = axes[0].imshow(original_slice, cmap='magma', aspect='auto', vmin=-vmax_orig, vmax=vmax_orig,
+                         extent=plot_extent)
     axes[0].set_title(f"1. 原始剖面 ({slice_info})")
     axes[0].set_ylabel(f"深度 (m), dz={params['dz']} m")
     axes[0].set_xlabel(xlabel)
-    axes[1].imshow(background_slice, cmap='seismic', aspect='auto', vmin=-vmax, vmax=vmax, extent=plot_extent)
+    fig.colorbar(im1, ax=axes[0], orientation='vertical', fraction=0.05, pad=0.04)  # 添加色标
+
+    # 绘制 2: 背景模型 (使用原始数据色标，保持对比一致性)
+    im2 = axes[1].imshow(background_slice, cmap='magma', aspect='auto', vmin=-vmax_orig, vmax=vmax_orig,
+                         extent=plot_extent)
     axes[1].set_title("2. 背景模型")
     axes[1].set_xlabel(xlabel)
-    axes[2].imshow(residual_slice, cmap='seismic', aspect='auto', vmin=-vmax, vmax=vmax, extent=plot_extent)
-    axes[2].set_title("3. 残差")
+    fig.colorbar(im2, ax=axes[1], orientation='vertical', fraction=0.05, pad=0.04)  # 添加色标
+
+    # 绘制 3: 残差 (使用残差数据自身的色标)
+    im3 = axes[2].imshow(residual_slice, cmap='seismic', aspect='auto', vmin=-vmax_residual, vmax=vmax_residual,
+                         extent=plot_extent)
+    axes[2].set_title("3. 残差 (自动调整色标)")
     axes[2].set_xlabel(xlabel)
+    fig.colorbar(im3, ax=axes[2], orientation='vertical', fraction=0.05, pad=0.04)  # 添加色标
+
     plt.suptitle(f"倾角匹配的滤波效果 ({slice_info})", fontsize=18)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
@@ -96,17 +127,17 @@ def visualize_results_slice_2d(
 # --- 主程序 ---
 if __name__ == '__main__':
     # --- 1. 设置文件路径 ---
-    SEISMIC_NPY_PATH = r'C:\Work\sunjie\Python\cavity_modeling\data\input_npy\yingxi_crop.npy'
-    DIP_IL_NPY_PATH = r'C:\Work\sunjie\Python\cavity_modeling\data\input_npy\yingxi_inline_dip.npy'
-    DIP_XL_NPY_PATH = r'C:\Work\sunjie\Python\cavity_modeling\data\input_npy\yingxi_xline_dip.npy'
+    SEISMIC_NPY_PATH = r'C:\Work\sunjie\Python\cavity_modeling\data\input_npy\luchang\LC_CUT.npy'
+    DIP_IL_NPY_PATH = r'C:\Work\sunjie\Python\cavity_modeling\data\input_npy\luchang\luchang_inline_dip.npy'
+    DIP_XL_NPY_PATH = r'C:\Work\sunjie\Python\cavity_modeling\data\input_npy\luchang\luchang_crossline_dip.npy'
 
     # --- 2. 定义数据采集参数 ---
     seismic_params_full = {'dz': 5.0, 'dy': 12.5, 'dx': 12.5}
 
     # --- 3. 定义处理目标和滤波参数 ---
     PROCESSING_AXIS = 1
-    SLICE_INDEX = 500
-    FILTER_HALF_LENGTH = 10
+    SLICE_INDEX = 200
+    FILTER_HALF_LENGTH = 20
     DIP_SMOOTHING_SIGMA = [1.5, 7.5]
 
     # --- 4. 加载完整的3D数据 ---
@@ -164,6 +195,8 @@ if __name__ == '__main__':
         params=params_2d,
         filter_half_length=FILTER_HALF_LENGTH
     )
+
+    np.save("sof.npy", seismic_2d_slice - background_model_2d)
 
     # --- 8. 可视化2D结果 ---
     visualize_results_slice_2d(

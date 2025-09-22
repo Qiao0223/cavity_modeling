@@ -154,7 +154,7 @@ if __name__ == '__main__':
         print("错误: 找不到 'config.json' 文件。")
         exit()
 
-    params = config['yingxi_crop']
+    params = config['luchang_crop']
     num_inline = params['inline_end'] - params['inline_start'] + 1
     num_xline = params['xline_end'] - params['xline_start'] + 1
 
@@ -162,13 +162,13 @@ if __name__ == '__main__':
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     DATA_DIR = os.path.join(BASE_DIR, 'data')
 
-    INPUT_SEGY_DIR = os.path.join(DATA_DIR, 'input_segy')
+    INPUT_SEGY_DIR = os.path.join(DATA_DIR, 'batch_luchang')
     INPUT_NPY_DIR = os.path.join(DATA_DIR, 'input_npy')
     OUTPUT_NPY_DIR = os.path.join(DATA_DIR, 'output_npy')
     OUTPUT_SEGY_DIR = os.path.join(DATA_DIR, 'output_segy')
-    BATCH_DIR = os.path.join(DATA_DIR, 'batch')
+    BATCH_DIR = os.path.join(DATA_DIR, 'output_npy')
     # 定义一个统一的参考文件路径
-    ref_segy_for_export_path = r"C:\Work\sunjie\Python\cavity_modeling\data\input_segy\yingxi_crop.segy"
+    ref_segy_for_export_path = r"C:\Work\sunjie\Python\cavity_modeling\data\batch_luchang\LC_CUT.segy"
 
     # =============================================================================
     #   使用时，请取消下面您想运行的场景的注释
@@ -176,16 +176,16 @@ if __name__ == '__main__':
 
     # --- 场景1: 导入单个文件 ---
     # print("\n==================== 场景1: 导入单个文件 ====================")
-    # segy_to_import_path = os.path.join(INPUT_SEGY_DIR, 'yingxi_crop.segy')
-    # if not os.path.exists(segy_to_import_path):
-    #     print(f"错误：要导入的SEGY文件不存在于 '{segy_to_import_path}'")
-    # else:
-    #     converter.import_segy_to_npy(
-    #         segy_path=segy_to_import_path,
-    #         out_dir=INPUT_NPY_DIR, # 将导入结果放入 input_npy 目录
-    #         num_inline=num_inline,
-    #         num_xline=num_xline
-    #     )
+    segy_to_import_path = r"C:\Work\sunjie\Python\cavity_modeling\data\input_segy\luchang_cavity_module.segy"
+    if not os.path.exists(segy_to_import_path):
+        print(f"错误：要导入的SEGY文件不存在于 '{segy_to_import_path}'")
+    else:
+        converter.import_segy_to_npy(
+            segy_path=segy_to_import_path,
+            out_dir=INPUT_NPY_DIR, # 将导入结果放入 input_npy 目录
+            num_inline=num_inline,
+            num_xline=num_xline
+        )
 
 
     # --- 场景2: 导出单个文件 ---
@@ -217,9 +217,9 @@ if __name__ == '__main__':
 
 
     # --- 场景4: 批量导出 ---
-    print("\n==================== 场景4: 批量导出 ====================")
-    converter.export_all(
-        in_dir=BATCH_DIR,
-        ref_segy_path=ref_segy_for_export_path,
-        out_dir=OUTPUT_SEGY_DIR
-    )
+    # print("\n==================== 场景4: 批量导出 ====================")
+    # converter.export_all(
+    #     in_dir=BATCH_DIR,
+    #     ref_segy_path=ref_segy_for_export_path,
+    #     out_dir=OUTPUT_SEGY_DIR
+    # )
